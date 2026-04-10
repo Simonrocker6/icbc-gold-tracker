@@ -1,6 +1,9 @@
 {
-  "timestamp": "2026-04-10T11:46:50.412573",
-  "status": "error",
-  "error": "module 'ssl' has no attribute 'OP_LEGACY_SERVER_CONNECT'",
-  "prices": {}
+  "timestamp": "2026-04-10T12:01:07.193913",
+  "source": "ICBC",
+  "status": "success",
+  "prices": {
+    "积存金": 1049.31,
+    "如意金积存": 1041.97
+  }
 }
