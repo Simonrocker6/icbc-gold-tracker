@@ -1,0 +1,41 @@
+name: Update ICBC Gold Price
+
+on:
+  schedule:
+    # 每 5 分钟运行一次（可根据需要调整）
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # 允许手动触发
+  push:
+    branches:
+      - main  # 首次推送时运行
+
+jobs:
+  fetch-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        
+    - name: Fetch gold price
+      run: |
+        python .github/scripts/fetch_price.py
+        
+    - name: Setup Git
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        
+    - name: Commit and push if changed
+      run: |
+        git add docs/data/
+        git diff --staged --quiet || (git commit -m "Update gold price: $(date +'%Y-%m-%d %H:%M')" && git push)
