@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-04-10T11:43:13.273464",
+  "timestamp": "2026-04-10T11:46:50.412573",
   "status": "error",
-  "error": "HTTPSConnectionPool(host='icbcphp.icbc.com.cn', port=443): Max retries exceeded with url: /icbc/newperbank/perbank3/gold/goldaccrual_query_out.jsp (Caused by SSLError(SSLError(1, '[SSL: UNSAFE_LEGACY_RENEGOTIATION_DISABLED] unsafe legacy renegotiation disabled (_ssl.c:1016)')))",
+  "error": "module 'ssl' has no attribute 'OP_LEGACY_SERVER_CONNECT'",
   "prices": {}
 }
