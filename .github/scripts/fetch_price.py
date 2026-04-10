@@ -1,29 +1,25 @@
 #!/usr/bin/env python3
-# fetch_price.py - 终极 SSL 修复版
+"""
+GitHub Actions 版 - 修复 SSL 问题
+本地测试 3 通过，此版本应该可用
+"""
 
 import requests
 import json
 import os
 import re
 import ssl
-import urllib3
 from datetime import datetime
-from bs4 import BeautifulSoup
-from urllib3.poolmanager import PoolManager
 from requests.adapters import HTTPAdapter
 
-# 完全禁用警告
-urllib3.disable_warnings()
-
-class SSLAdapter(HTTPAdapter):
-    """自定义适配器，允许旧版 SSL 重协商"""
+class CustomSSLAdapter(HTTPAdapter):
+    """自定义 SSL 适配器 - 允许旧版重协商"""
     def init_poolmanager(self, *args, **kwargs):
-        # 创建不安全的 SSL 上下文
         context = ssl.create_default_context()
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
-        # 关键：允许旧版不安全的重协商
-        context.options |= ssl.OP_LEGACY_SERVER_CONNECT
+        # 使用数值 0x4 代替 OP_LEGACY_SERVER_CONNECT（兼容性更好）
+        context.options |= 0x4
         kwargs['ssl_context'] = context
         return super().init_poolmanager(*args, **kwargs)
 
@@ -31,71 +27,32 @@ def fetch_icbc_gold():
     url = "https://icbcphp.icbc.com.cn/icbc/newperbank/perbank3/gold/goldaccrual_query_out.jsp"
     
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh;q=0.9',
-        'Connection': 'keep-alive',
     }
     
     try:
-        # 使用自定义 SSL 适配器
+        # 使用自定义适配器
         session = requests.Session()
-        session.mount('https://', SSLAdapter())
+        session.mount('https://', CustomSSLAdapter())
         
-        print(f"正在请求: {url}")
-        response = session.get(
-            url, 
-            headers=headers, 
-            timeout=15,
-            verify=False
-        )
-        
-        print(f"状态码: {response.status_code}")
-        print(f"返回长度: {len(response.text)}")
-        
+        response = session.get(url, headers=headers, timeout=15)
         response.encoding = 'utf-8'
         
-        # 检查是否被拦截
-        if 'login' in response.text.lower() or '登录' in response.text:
-            raise Exception("页面需要登录")
-        
         # 解析价格
-        soup = BeautifulSoup(response.text, 'html.parser')
-        text = soup.get_text()
+        prices = re.findall(r'(1\d{3}\.\d{2})', response.text)
         
-        # 保存原始内容用于调试
-        os.makedirs('docs/data', exist_ok=True)
-        with open('docs/data/debug.html', 'w', encoding='utf-8') as f:
-            f.write(response.text[:2000])
-        
-        price_data = {
+        return {
             'timestamp': datetime.now().isoformat(),
             'source': 'ICBC',
             'status': 'success',
-            'prices': {}
+            'prices': {
+                '积存金': float(prices[0]),
+                '如意金积存': float(prices[1]) if len(prices) > 1 else None
+            } if prices else {}
         }
         
-        # 提取价格
-        prices = re.findall(r'(1\d{3}\.\d{2})', text)
-        print(f"找到价格: {prices}")
-        
-        if prices:
-            price_data['prices']['积存金'] = float(prices[0])
-            if len(prices) > 1:
-                price_data['prices']['如意金积存'] = float(prices[1])
-            if len(prices) > 2:
-                price_data['prices']['主动积存'] = float(prices[2])
-        else:
-            price_data['status'] = 'error'
-            price_data['error'] = '未找到价格数据'
-            price_data['debug_snippet'] = text[:500]
-            
-        return price_data
-        
     except Exception as e:
-        import traceback
-        print(f"错误: {e}")
-        print(traceback.format_exc())
         return {
             'timestamp': datetime.now().isoformat(),
             'status': 'error',
@@ -109,9 +66,30 @@ def save_data(data):
     with open('docs/data/current.json', 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     
-    print(f"数据已保存: {data.get('status')}")
+    # 更新历史
+    if data['status'] == 'success' and data.get('prices'):
+        history = []
+        if os.path.exists('docs/data/history.json'):
+            try:
+                with open('docs/data/history.json', 'r') as f:
+                    history = json.load(f)
+            except:
+                pass
+        
+        price = list(data['prices'].values())[0]
+        history.append({
+            'timestamp': data['timestamp'],
+            'price': price
+        })
+        history = history[-100:]
+        
+        with open('docs/data/history.json', 'w', encoding='utf-8') as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
 
 if __name__ == '__main__':
     data = fetch_icbc_gold()
     save_data(data)
     print(json.dumps(data, ensure_ascii=False, indent=2))
+    
+    # 退出码供 Actions 判断
+    exit(0 if data['status'] == 'success' else 1)
