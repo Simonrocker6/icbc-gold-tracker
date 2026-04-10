@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工行积存金价格实时看板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .header .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .price-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 15px;
+            padding: 30px;
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .price-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+            opacity: 0.3;
+        }
+        
+        .price-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .price-value {
+            font-size: 48px;
+            font-weight: bold;
+            margin: 10px 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .price-unit {
+            font-size: 20px;
+            opacity: 0.8;
+        }
+        
+        .price-change {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .info-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .info-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .update-time {
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .refresh-btn {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .refresh-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+        
+        .chart-container {
+            margin-top: 30px;
+            height: 200px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .updating {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏆 工行积存金</h1>
+            <div class="subtitle">实时价格监控面板</div>
+        </div>
+        
+        <div id="error-msg" class="error-message"></div>
+        
+        <div id="price-card" class="price-card">
+            <div class="price-label">当前价格</div>
+            <div class="price-value">
+                <span id="current-price">--</span>
+                <span class="price-unit">元/克</span>
+            </div>
+            <div id="price-change" class="price-change" style="display: none;">
+                <span id="change-icon">📈</span>
+                <span id="change-value">--</span>
+            </div>
+        </div>
+        
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">如意金积存</div>
+                <div class="info-value" id="ruyi-price">--</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">主动积存</div>
+                <div class="info-value" id="active-price">--</div>
+            </div>
+        </div>
+        
+        <div class="update-time">
+            更新时间：<span id="update-time">--</span>
+            <br>
+            <small>数据每 5 分钟自动刷新</small>
+        </div>
+        
+        <button class="refresh-btn" onclick="refreshData()">
+            🔄 立即刷新
+        </button>
+        
+        <div class="chart-container">
+            <canvas id="priceChart"></canvas>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let priceChart = null;
+        
+        async function fetchData() {
+            const btn = document.querySelector('.refresh-btn');
+            const card = document.getElementById('price-card');
+            
+            btn.disabled = true;
+            card.classList.add('updating');
+            
+            try {
+                // 添加时间戳防止缓存
+                const response = await fetch(`data/current.json?t=${Date.now()}`);
+                const data = await response.json();
+                
+                if (data.status === 'error') {
+                    throw new Error(data.error || '获取数据失败');
+                }
+                
+                updateUI(data);
+                document.getElementById('error-msg').style.display = 'none';
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('error-msg').textContent = '获取数据失败：' + error.message;
+                document.getElementById('error-msg').style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                card.classList.remove('updating');
+            }
+        }
+        
+        function updateUI(data) {
+            const prices = data.prices || {};
+            
+            // 主显示（优先显示积存金，其次是如意金）
+            const mainPrice = prices['积存金'] || prices['如意金积存'] || prices['主动积存价'] || Object.values(prices)[0];
+            if (mainPrice) {
+                document.getElementById('current-price').textContent = mainPrice.toFixed(2);
+            }
+            
+            // 详细信息
+            document.getElementById('ruyi-price').textContent = prices['如意金积存'] ? prices['如意金积存'].toFixed(2) : '--';
+            document.getElementById('active-price').textContent = prices['主动积存价'] ? prices['主动积存价'].toFixed(2) : '--';
+            
+            // 更新时间
+            const date = new Date(data.timestamp);
+            document.getElementById('update-time').textContent = date.toLocaleString('zh-CN');
+            
+            // 计算涨跌幅（需要历史数据）
+            updateChangeIndicator(mainPrice);
+            
+            // 更新图表
+            updateChart();
+        }
+        
+        async function updateChangeIndicator(currentPrice) {
+            try {
+                const response = await fetch(`data/history.json?t=${Date.now()}`);
+                const history = await response.json();
+                
+                if (history.length >= 2) {
+                    const previous = history[history.length - 2].price;
+                    const change = ((currentPrice - previous) / previous * 100).toFixed(2);
+                    const changeEl = document.getElementById('price-change');
+                    const iconEl = document.getElementById('change-icon');
+                    const valueEl = document.getElementById('change-value');
+                    
+                    changeEl.style.display = 'inline-flex';
+                    iconEl.textContent = change >= 0 ? '📈' : '📉';
+                    valueEl.textContent = (change >= 0 ? '+' : '') + change + '%';
+                    valueEl.style.color = change >= 0 ? '#4caf50' : '#f44336';
+                }
+            } catch (e) {
+                console.log('无法计算涨跌幅');
+            }
+        }
+        
+        async function updateChart() {
+            try {
+                const response = await fetch(`data/history.json?t=${Date.now()}`);
+                const history = await response.json();
+                
+                const ctx = document.getElementById('priceChart').getContext('2d');
+                const labels = history.map(h => {
+                    const d = new Date(h.timestamp);
+                    return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
+                }).slice(-20); // 最近20个点
+                
+                const data = history.map(h => h.price).slice(-20);
+                
+                if (priceChart) {
+                    priceChart.destroy();
+                }
+                
+                priceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '价格走势',
+                            data: data,
+                            borderColor: 'rgb(102, 126, 234)',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value.toFixed(0);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (e) {
+                console.log('图表更新失败');
+            }
+        }
+        
+        function refreshData() {
+            fetchData();
+        }
+        
+        // 页面加载时获取数据
+        fetchData();
+        
+        // 每 60 秒自动刷新（前端轮询）
+        setInterval(fetchData, 60000);
+    </script>
+</body>
+</html>
