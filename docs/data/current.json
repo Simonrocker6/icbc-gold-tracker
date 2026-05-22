@@ -1,9 +1,6 @@
 {
-  "timestamp": "2026-05-21T23:41:59.081122",
+  "timestamp": "2026-05-22T01:49:22.498589",
   "source": "ICBC",
   "status": "success",
-  "prices": {
-    "积存金": 1001.92,
-    "如意金积存": null
-  }
+  "prices": {}
 }
